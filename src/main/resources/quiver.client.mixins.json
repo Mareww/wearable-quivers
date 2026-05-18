@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "net.marewmod.quiver.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "HandledScreenAccessor",
+    "ItemStackTooltipMixin",
+    "EnchDescMixin",
+    "HandledScreenScrollMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "slots": [
+    "legs/quiver"
+  ],
+  "entities": [
+    "minecraft:player"
+  ]
+}

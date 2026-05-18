@@ -1,0 +1,37 @@
+{
+  "enchantment.minecraft.infinity": "Conservation",
+  "enchantment.minecraft.infinity.desc.1": "25% chance to save an arrow when shooting.",
+  "enchantment.minecraft.infinity.desc.2": "50% chance to save an arrow when shooting.",
+
+  "category.quiver.smithing": "Quiver Smithing",
+
+  "item.quiver.quiver": "Quiver",
+  "item.quiver.copper_quiver": "Copper Quiver",
+  "item.quiver.iron_quiver": "Iron Quiver",
+  "item.quiver.gold_quiver": "Golden Quiver",
+  "item.quiver.diamond_quiver": "Diamond Quiver",
+  "item.quiver.netherite_quiver": "Netherite Quiver",
+  "itemGroup.quiver.quiver": "Wearable Quivers",
+
+  "config.wearable_quivers.title": "Wearable Quivers",
+  "config.wearable_quivers.showStrap": "Show Body Strap",
+
+  "config.wearable_quivers.hipSide": "Hip Side",
+  "config.wearable_quivers.option.hipSide.LEFT": "Left",
+  "config.wearable_quivers.option.hipSide.RIGHT": "Right",
+
+  "config.wearable_quivers.back": "Back",
+  "config.wearable_quivers.back.x": "X",
+  "config.wearable_quivers.back.y": "Y",
+  "config.wearable_quivers.back.z": "Z",
+
+  "config.wearable_quivers.leftHip": "Left Hip",
+  "config.wearable_quivers.leftHip.x": "X",
+  "config.wearable_quivers.leftHip.y": "Y",
+  "config.wearable_quivers.leftHip.z": "Z",
+
+  "config.wearable_quivers.rightHip": "Right Hip",
+  "config.wearable_quivers.rightHip.x": "X",
+  "config.wearable_quivers.rightHip.y": "Y",
+  "config.wearable_quivers.rightHip.z": "Z"
+}

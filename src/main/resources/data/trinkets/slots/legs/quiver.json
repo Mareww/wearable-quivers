@@ -1,0 +1,6 @@
+{
+  "order": 10,
+  "amount": 1,
+  "icon": "quiver:gui/slots/quiver_slot",
+  "validator_predicates": ["trinkets:tag"]
+}

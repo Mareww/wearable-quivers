@@ -1,0 +1,6 @@
+﻿{
+  "type": "quiver:quiver_smithing",
+  "base": { "item": "quiver:quiver" },
+  "addition": { "item": "minecraft:copper_ingot" },
+  "result": { "item": "quiver:copper_quiver" }
+}
