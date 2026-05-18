@@ -29,7 +29,6 @@ public class PlayerInventoryMixin {
                 dev.emi.trinkets.api.SlotReference ref = pair.getLeft();
                 ItemStack quiverStack = ref.inventory().getStack(ref.index());
                 if (!(quiverStack.getItem() instanceof QuiverItem)) continue;
-                net.marewmod.quiver.item.QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
                 int inserted = QuiverItem.insertPublic(quiverStack, stack);
                 if (inserted > 0) {
                     stack.decrement(inserted);

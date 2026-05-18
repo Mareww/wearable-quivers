@@ -41,7 +41,6 @@ public class ItemEntityMixin {
                 ItemStack toInsert = entityStack.copy();
                 toInsert.setCount(Math.min(entityStack.getCount(), space));
 
-                net.marewmod.quiver.item.QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
                 int inserted = QuiverItem.insertPublic(quiverStack, toInsert);
                 if (inserted <= 0) return;
 

@@ -39,13 +39,6 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
     /** Set during right-click equip to steer Trinkets into the preferred slot group. */
     public static final ThreadLocal<String> EQUIP_PREFERRED_GROUP = ThreadLocal.withInitial(() -> null);
 
-    /** Players for whom the next onEquip sound should be suppressed (scroll or auto-move). */
-    public static final java.util.Set<java.util.UUID> SUPPRESS_EQUIP_SOUND =
-        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
-
-    /** Nanosecond timestamp of the last onUnequip per player — used to detect NBT-only changes. */
-    private static final java.util.Map<java.util.UUID, Long> LAST_UNEQUIP_NS =
-        new java.util.concurrent.ConcurrentHashMap<>();
 
 
     public static final String SLOTS_KEY = "ArrowSlots";
@@ -96,21 +89,12 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
     }
 
     @Override
-    public void onUnequip(ItemStack stack, SlotReference slot, LivingEntity entity) {
-        if (entity instanceof PlayerEntity player)
-            LAST_UNEQUIP_NS.put(player.getUuid(), System.nanoTime());
-    }
+    public void onUnequip(ItemStack stack, SlotReference slot, LivingEntity entity) {}
 
     @Override
-    public void onEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {
-        if (entity instanceof PlayerEntity player && SUPPRESS_EQUIP_SOUND.remove(player.getUuid())) return;
-        // If onUnequip fired <5 ms ago it's an NBT-only change (scroll/shoot), not a real equip
-        if (entity instanceof PlayerEntity player) {
-            Long t = LAST_UNEQUIP_NS.remove(player.getUuid());
-            if (t != null && System.nanoTime() - t < 5_000_000L) return;
-        }
-        entity.playSound(net.minecraft.sound.SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 1.0f, 1.0f);
-    }
+    public void onEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {}
+    // Sound is played directly in use() so it only fires on explicit right-click equip,
+    // never on scroll/shoot NBT changes or Trinkets component syncs.
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
@@ -120,6 +104,8 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
         boolean equipped = TrinketItem.equipItem(user, stack);
         EQUIP_PREFERRED_GROUP.remove();
         if (!equipped) equipped = TrinketItem.equipItem(user, stack);
+        if (equipped && !world.isClient())
+            user.playSound(net.minecraft.sound.SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 1.0f, 1.0f);
         return equipped ? TypedActionResult.success(stack) : TypedActionResult.fail(stack);
     }
 

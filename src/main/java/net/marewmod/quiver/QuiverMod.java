@@ -47,37 +47,73 @@ public class QuiverMod implements ModInitializer {
 
         ServerPlayNetworking.registerGlobalReceiver(QUIVER_SCROLL_PACKET,
             (server, player, handler, buf, responseSender) -> {
-                int direction = buf.readInt();
-                buf.readInt(); // slot ID no longer used — find quiver directly
+                int direction  = buf.readInt();
+                String reqGroup = buf.readString(); // exact slot group the user scrolled over ("" = any)
+                String reqName  = buf.readString(); // exact slot name  ("" = any)
                 server.execute(() -> {
-                    QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
-                    
-                    // Find the quiver in Trinkets slots first (equipped)
                     boolean found = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(player).map(comp -> {
-                        for (var groupEntry : comp.getInventory().entrySet()) {
-                            for (var slotEntry : groupEntry.getValue().entrySet()) {
-                                var inv = slotEntry.getValue();
-                                for (int i = 0; i < inv.size(); i++) {
-                                    ItemStack s = inv.getStack(i);
-                                    if (!(s.getItem() instanceof QuiverItem)) continue;
-                                    int n = QuiverItem.getSlotCount(s);
-                                    if (n <= 1) continue;
-                                    int cur = QuiverItem.getSelectedSlot(s);
-                                    int next = Math.max(0, Math.min(n - 1, cur + direction));
-                                    ItemStack updated = s.copy();
-                                    QuiverItem.setSelectedSlot(updated, next);
-                                    inv.setStack(i, updated);
-                                    if (player instanceof net.minecraft.server.network.ServerPlayerEntity) {
-                                        net.minecraft.server.network.ServerPlayerEntity sp = (net.minecraft.server.network.ServerPlayerEntity) player;
-                                        var buf2 = PacketByteBufs.create();
-                                        buf2.writeInt(next);
-                                        net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(sp, QUIVER_SYNC_PACKET, buf2);
-                                    }
-                                    return true;
+                        var allQuivers = comp.getAllEquipped().stream()
+                            .filter(p -> p.getRight().getItem() instanceof QuiverItem)
+                            .toList();
+                        if (allQuivers.isEmpty()) return false;
+
+                        // If the quiver is in the player's regular inventory, any Trinkets quiver
+                        // is a stale ghost from a component sync — clear it and fall back to inventory
+                        boolean quiverInInventory = false;
+                        for (int i = 0; i < player.getInventory().size(); i++) {
+                            if (player.getInventory().getStack(i).getItem() instanceof QuiverItem) {
+                                quiverInInventory = true; break;
+                            }
+                        }
+                        if (quiverInInventory) {
+                            allQuivers.forEach(p -> p.getLeft().inventory().setStack(p.getLeft().index(), ItemStack.EMPTY));
+                            return false; // fall through to inventory fallback
+                        }
+
+                        // Find the target slot:
+                        // – if the client told us exactly which slot (inventory scroll), use that
+                        // – otherwise (in-world scroll) prefer legs, then chest
+                        dev.emi.trinkets.api.SlotReference target = null;
+                        if (!reqGroup.isEmpty()) {
+                            for (var p : allQuivers) {
+                                var st = p.getLeft().inventory().getSlotType();
+                                if (st.getGroup().equals(reqGroup) && st.getName().equals(reqName)) {
+                                    target = p.getLeft(); break;
                                 }
                             }
                         }
-                        return false;
+                        if (target == null) {
+                            // Prefer legs/quiver; fall back to chest/back
+                            for (var p : allQuivers) {
+                                target = p.getLeft();
+                                if (target.inventory().getSlotType().getGroup().equals("legs")) break;
+                            }
+                        }
+                        if (target == null) return false;
+
+                        // Clear every OTHER quiver slot (ghost cleanup)
+                        final dev.emi.trinkets.api.SlotReference keep = target;
+                        for (var p : allQuivers) {
+                            var ref2 = p.getLeft();
+                            if (ref2.inventory() == keep.inventory() && ref2.index() == keep.index()) continue;
+                            ref2.inventory().setStack(ref2.index(), ItemStack.EMPTY);
+                        }
+
+                        ItemStack live = keep.inventory().getStack(keep.index());
+                        int n = QuiverItem.getSlotCount(live);
+                        if (n <= 1) return allQuivers.size() > 1; // deduped but nothing to scroll
+                        int cur  = QuiverItem.getSelectedSlot(live);
+                        int next = Math.max(0, Math.min(n - 1, cur + direction));
+                        ItemStack updated = live.copy();
+                        QuiverItem.setSelectedSlot(updated, next);
+                        keep.inventory().setStack(keep.index(), updated);
+                        if (player instanceof net.minecraft.server.network.ServerPlayerEntity) {
+                            net.minecraft.server.network.ServerPlayerEntity sp = (net.minecraft.server.network.ServerPlayerEntity) player;
+                            var b2 = PacketByteBufs.create();
+                            b2.writeInt(next);
+                            net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking.send(sp, QUIVER_SYNC_PACKET, b2);
+                        }
+                        return true;
                     }).orElse(false);
 
                     // Fallback: quiver is in the player's inventory (not equipped)

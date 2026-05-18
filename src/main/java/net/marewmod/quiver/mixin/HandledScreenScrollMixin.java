@@ -8,8 +8,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.Mouse;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
 import net.minecraft.screen.slot.Slot;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -42,7 +40,8 @@ public class HandledScreenScrollMixin {
                     int direction = vertical < 0 ? 1 : -1;
                     var buf = net.fabricmc.fabric.api.networking.v1.PacketByteBufs.create();
                     buf.writeInt(direction);
-                    buf.writeInt(-1);
+                    buf.writeString(""); // no specific slot for in-world scroll
+                    buf.writeString("");
                     net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
                         net.marewmod.quiver.QuiverMod.QUIVER_SCROLL_PACKET, buf);
                     ci.cancel();
@@ -86,15 +85,29 @@ public class HandledScreenScrollMixin {
 
         int direction = vertical < 0 ? 1 : -1;
 
-        if (slotCount > 1 && client.world != null && client.player != null) {
-            client.world.playSound(client.player.getX(), client.player.getY(), client.player.getZ(),
-                SoundEvents.ITEM_CROSSBOW_QUICK_CHARGE_1, SoundCategory.PLAYERS, 0.4f, 1.4f, false);
+        // Find which Trinkets slot is being scrolled by matching the slot's backing inventory
+        String slotGroup = "";
+        String slotName  = "";
+        if (quiverSlot instanceof dev.emi.trinkets.TrinketSlot && client.player != null) {
+            var compOpt = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(client.player);
+            if (compOpt.isPresent()) {
+                for (var pair : compOpt.get().getAllEquipped()) {
+                    if (!(pair.getRight().getItem() instanceof QuiverItem)) continue;
+                    var ref = pair.getLeft();
+                    if (quiverSlot.inventory == ref.inventory()) {
+                        slotGroup = ref.inventory().getSlotType().getGroup();
+                        slotName  = ref.inventory().getSlotType().getName();
+                        break;
+                    }
+                }
+            }
         }
 
         var buf = PacketByteBufs.create();
         buf.writeInt(direction);
-        buf.writeInt(quiverSlot.id);
+        buf.writeString(slotGroup);
+        buf.writeString(slotName);
         ClientPlayNetworking.send(QuiverMod.QUIVER_SCROLL_PACKET, buf);
-        ci.cancel(); // consume scroll so it doesn't propagate
+        ci.cancel();
     }
 }

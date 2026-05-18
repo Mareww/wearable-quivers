@@ -112,25 +112,7 @@ public class QuiverModClient implements ClientModInitializer {
             QuiverMod.QUIVER_SYNC_PACKET, (client, handler, buf, responseSender) -> {
                 int selectedSlot = buf.readInt();
                 client.execute(() -> {
-                    if (client.player == null) { net.marewmod.quiver.QuiverMod.LOGGER.info("[QuiverSync CLIENT] player null"); return; }
-                    boolean[] found = {false};
-                    dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(client.player).ifPresent(comp ->
-                        comp.getInventory().values().forEach(groupMap ->
-                            groupMap.values().forEach(inv -> {
-                                for (int i = 0; i < inv.size(); i++) {
-                                    if (inv.getStack(i).getItem() instanceof QuiverItem) {
-                                        // Write back a copy so the slot reference reflects the change
-                                        net.minecraft.item.ItemStack updated = inv.getStack(i).copy();
-                                        QuiverItem.setSelectedSlot(updated, selectedSlot);
-                                        inv.setStack(i, updated);
-                                        found[0] = true;
-                                        return;
-                                    }
-                                }
-                            })
-                        )
-                    );
-                    if (!found[0]) net.marewmod.quiver.QuiverMod.LOGGER.info("[QuiverSync CLIENT] quiver not found on client!");
+                    if (client.player == null) return;
                 });
             });
 
@@ -383,29 +365,29 @@ public class QuiverModClient implements ClientModInitializer {
         }
         if (quiverSlot == null) return true;
         int direction = vert < 0 ? 1 : -1;
-        var buf = PacketByteBufs.create();
-        buf.writeInt(direction);
-        buf.writeInt(quiverSlot.id); // kept for protocol compatibility, ignored server-side
-        // Check slot count from stack OR from equipped Trinkets quiver
-        int slotCount = QuiverItem.getSlotCount(quiverSlot.getStack());
-        if (slotCount == 0 && hasEquippedQuiver && MinecraftClient.getInstance().player != null) {
-            slotCount = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(MinecraftClient.getInstance().player)
-                .map(comp -> comp.getAllEquipped().stream()
-                    .filter(pair -> pair.getRight().getItem() instanceof QuiverItem)
-                    .mapToInt(pair -> QuiverItem.getSlotCount(pair.getRight()))
-                    .findFirst().orElse(0))
-                .orElse(0);
-        }
-        // Only play sound if there are multiple arrow types to actually scroll between
-        if (slotCount > 1) {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.world != null && mc.player != null) {
-                mc.world.playSound(
-                    mc.player.getX(), mc.player.getY(), mc.player.getZ(),
-                    SoundEvents.ITEM_CROSSBOW_QUICK_CHARGE_1,
-                    SoundCategory.PLAYERS, 0.4f, 1.4f, false);
+
+        // Find which Trinkets slot the quiver is in (same logic as HandledScreenScrollMixin)
+        String slotGroup = "";
+        String slotName  = "";
+        if (quiverSlot instanceof dev.emi.trinkets.TrinketSlot && MinecraftClient.getInstance().player != null) {
+            var compOpt = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(MinecraftClient.getInstance().player);
+            if (compOpt.isPresent()) {
+                for (var pair : compOpt.get().getAllEquipped()) {
+                    if (!(pair.getRight().getItem() instanceof QuiverItem)) continue;
+                    var ref = pair.getLeft();
+                    if (quiverSlot.inventory == ref.inventory()) {
+                        slotGroup = ref.inventory().getSlotType().getGroup();
+                        slotName  = ref.inventory().getSlotType().getName();
+                        break;
+                    }
+                }
             }
         }
+
+        var buf = PacketByteBufs.create();
+        buf.writeInt(direction);
+        buf.writeString(slotGroup);
+        buf.writeString(slotName);
         ClientPlayNetworking.send(QuiverMod.QUIVER_SCROLL_PACKET, buf);
         return false;
     }
