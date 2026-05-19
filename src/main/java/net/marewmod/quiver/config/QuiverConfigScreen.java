@@ -37,8 +37,7 @@ public class QuiverConfigScreen extends Screen {
         addDrawableChild(toggle(cx, y, "Wiggle Physics",  cfg.enable_wiggle, v -> cfg.enable_wiggle = v)); y += 34;
 
         // ── Behaviour ──────────────────────────────────────────────────────
-        addDrawableChild(toggle(cx, y, "Arrow Auto-Fill", cfg.auto_fill,   v -> cfg.auto_fill   = v)); y += 26;
-        addDrawableChild(toggle(cx, y, "Auto-Switch Slot",cfg.auto_switch, v -> cfg.auto_switch = v)); y += 34;
+        addDrawableChild(toggle(cx, y, "Enchantment Glint", cfg.enchantment_glint,  v -> cfg.enchantment_glint = v)); y += 34;
 
         // ── Position ───────────────────────────────────────────────────────
         addDrawableChild(CyclingButtonWidget.<String>builder(v -> Text.literal(v.equals("left") ? "Left" : "Right"))

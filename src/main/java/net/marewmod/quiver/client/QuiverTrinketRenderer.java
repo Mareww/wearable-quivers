@@ -89,7 +89,9 @@ public class QuiverTrinketRenderer implements TrinketRenderer {
             matrices.scale(0.7f, 0.7f, 0.7f);
             matrices.translate(-0.5f, -0.5f, -0.5f);
             BALDRIC_MODE.set(true);
-            renderItem(stack, matrices, vertexConsumers, entity, light);
+            net.marewmod.quiver.item.QuiverItem.IN_TRINKET_RENDER.set(true);
+            try { renderItem(stack, matrices, vertexConsumers, entity, light); }
+            finally { net.marewmod.quiver.item.QuiverItem.IN_TRINKET_RENDER.set(false); }
             BALDRIC_MODE.remove();
             matrices.pop();
         }

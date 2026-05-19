@@ -29,11 +29,20 @@ public class QuiverMod implements ModInitializer {
     public static final String MOD_ID = "quiver";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
+    public static final net.minecraft.enchantment.Enchantment AUTO_REFILL =
+        net.minecraft.registry.Registry.register(
+            net.minecraft.registry.Registries.ENCHANTMENT,
+            new Identifier(MOD_ID, "auto_refill"),
+            new net.marewmod.quiver.enchantment.AutoRefillEnchantment());
+
     /** Client → server: scroll over a quiver slot to change selected arrow type. */
     public static final Identifier QUIVER_SCROLL_PACKET = new Identifier(MOD_ID, "scroll");
 
     /** Server → client: update the SelectedSlot of the equipped quiver directly. */
     public static final Identifier QUIVER_SYNC_PACKET = new Identifier(MOD_ID, "sync_slot");
+
+    /** Client → server: toggle Auto Refill active/paused on the hovered quiver. */
+    public static final Identifier QUIVER_TOGGLE_REFILL = new Identifier(MOD_ID, "toggle_refill");
 
 
     @Override
@@ -135,6 +144,96 @@ public class QuiverMod implements ModInitializer {
                 });
             });
 
+
+        // Toggle Auto Refill (T key from client)
+        ServerPlayNetworking.registerGlobalReceiver(QUIVER_TOGGLE_REFILL,
+            (server, player, handler, buf, responseSender) -> server.execute(() -> {
+                boolean toggled = dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(player)
+                    .map(comp -> {
+                        for (var pair : comp.getAllEquipped()) {
+                            ItemStack s = pair.getLeft().inventory().getStack(pair.getLeft().index());
+                            if (!(s.getItem() instanceof QuiverItem)) continue;
+                            if (net.minecraft.enchantment.EnchantmentHelper.getLevel(AUTO_REFILL, s) <= 0) continue;
+                            ItemStack copy = s.copy();
+                            QuiverItem.toggleAutoRefill(copy);
+                            QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
+                            pair.getLeft().inventory().setStack(pair.getLeft().index(), copy);
+                            return true;
+                        }
+                        return false;
+                    }).orElse(false);
+                if (!toggled) {
+                    for (int i = 0; i < player.getInventory().size(); i++) {
+                        ItemStack s = player.getInventory().getStack(i);
+                        if (!(s.getItem() instanceof QuiverItem)) continue;
+                        if (net.minecraft.enchantment.EnchantmentHelper.getLevel(AUTO_REFILL, s) <= 0) continue;
+                        QuiverItem.toggleAutoRefill(s);
+                        player.getInventory().markDirty();
+                        break;
+                    }
+                }
+            }));
+
+        // AutoRefill tick — pull arrows from inventory into the equipped quiver (every second)
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents.END_SERVER_TICK.register(server -> {
+            for (var player : server.getPlayerManager().getPlayerList()) {
+                if (player.age % 20 != 0) continue;
+                dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(player).ifPresent(comp ->
+                    comp.getAllEquipped().stream()
+                        .filter(p -> p.getRight().getItem() instanceof QuiverItem)
+                        .max(java.util.Comparator.comparingInt(p ->
+                            QuiverItem.getTotalCount(p.getLeft().inventory().getStack(p.getLeft().index()))))
+                        .ifPresent(pair -> {
+                            dev.emi.trinkets.api.SlotReference ref = pair.getLeft();
+                            ItemStack quiverStack = ref.inventory().getStack(ref.index());
+                            if (net.minecraft.enchantment.EnchantmentHelper.getLevel(AUTO_REFILL, quiverStack) <= 0) return;
+                            if (!QuiverItem.isAutoRefillActive(quiverStack)) return;
+                            int space = QuiverItem.getMaxCapacity(quiverStack) - QuiverItem.getTotalCount(quiverStack);
+                            if (space <= 0) return;
+                            boolean any = false;
+                            for (int i = 0; i < player.getInventory().size() && space > 0; i++) {
+                                ItemStack inv = player.getInventory().getStack(i);
+                                if (!(inv.getItem() instanceof net.minecraft.item.ArrowItem)) continue;
+                                int inserted = QuiverItem.insertPublic(quiverStack, inv);
+                                if (inserted <= 0) continue;
+                                inv.decrement(inserted);
+                                space -= inserted;
+                                any = true;
+                            }
+                            if (any) {
+                                QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
+                                ref.inventory().markDirty();
+                            }
+                        })
+                );
+            }
+        });
+
+        // AutoRefill enchanted book in nether fortress + bastion, and master fletcher trade
+        LootTableEvents.MODIFY.register((rm, manager, id, tableBuilder, source) -> {
+            if (!source.isBuiltin()) return;
+            String s = id.toString();
+            if (s.equals("minecraft:chests/nether_bridge") || s.equals("minecraft:chests/bastion_treasure")) {
+                net.minecraft.item.ItemStack book = net.minecraft.item.Items.ENCHANTED_BOOK.getDefaultStack();
+                net.minecraft.item.EnchantedBookItem.addEnchantment(book,
+                    new net.minecraft.enchantment.EnchantmentLevelEntry(AUTO_REFILL, 1));
+                tableBuilder.pool(LootPool.builder()
+                    .rolls(ConstantLootNumberProvider.create(1))
+                    .with(ItemEntry.builder(net.minecraft.item.Items.ENCHANTED_BOOK)
+                        .apply(net.minecraft.loot.function.SetNbtLootFunction.builder(book.getNbt())))
+                    .conditionally(RandomChanceLootCondition.builder(0.06f)));
+            }
+        });
+
+        net.fabricmc.fabric.api.object.builder.v1.trade.TradeOfferHelper.registerVillagerOffers(
+            net.minecraft.village.VillagerProfession.FLETCHER, 5,
+            factories -> factories.add((entity, random) -> {
+                net.minecraft.item.ItemStack book = net.minecraft.item.Items.ENCHANTED_BOOK.getDefaultStack();
+                net.minecraft.item.EnchantedBookItem.addEnchantment(book,
+                    new net.minecraft.enchantment.EnchantmentLevelEntry(AUTO_REFILL, 1));
+                return new net.minecraft.village.TradeOffer(
+                    new ItemStack(net.minecraft.item.Items.EMERALD, 24), book, 1, 30, 0.05f);
+            }));
 
         // Add quivers to loot tables
         LootTableEvents.MODIFY.register((resourceManager, lootManager, id, tableBuilder, source) -> {

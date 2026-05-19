@@ -266,6 +266,23 @@ public class QuiverModClient implements ClientModInitializer {
             ScreenMouseEvents.allowMouseScroll(screen).register(
                 (s, mouseX, mouseY, horiz, vert) -> handleQuiverScroll(s, mouseX, mouseY, vert)
             );
+            // T key while hovering over a quiver with Auto Refill → toggle active/paused
+            net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents.allowKeyPress(screen).register(
+                (s, key, scancode, modifiers) -> {
+                    if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_T) {
+                        HandledScreenAccessor acc = (HandledScreenAccessor) s;
+                        net.minecraft.screen.slot.Slot focused = acc.getFocusedSlot();
+                        if (focused != null && focused.hasStack()
+                                && focused.getStack().getItem() instanceof QuiverItem
+                                && EnchantmentHelper.getLevel(QuiverMod.AUTO_REFILL, focused.getStack()) > 0) {
+                            net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking.send(
+                                QuiverMod.QUIVER_TOGGLE_REFILL,
+                                net.fabricmc.fabric.api.networking.v1.PacketByteBufs.empty());
+                            return false;
+                        }
+                    }
+                    return true;
+                });
         });
 
         // Level-specific Conservation description in tooltips (works with or without EnchDesc)
@@ -287,6 +304,29 @@ public class QuiverModClient implements ClientModInitializer {
                 }
             }
             lines.add(desc); // fallback: append at end
+        });
+
+        // Auto Refill description + Active/Inactive status on quiver tooltip
+        ItemTooltipCallback.EVENT.register((stack, context, lines) -> {
+            if (!(stack.getItem() instanceof QuiverItem)) return;
+            if (EnchantmentHelper.getLevel(QuiverMod.AUTO_REFILL, stack) <= 0) return;
+            lines.removeIf(line -> line != null && line.getString().isEmpty());
+            String descStr = Text.translatable("enchantment.quiver.auto_refill.desc").getString();
+            boolean descPresent = lines.stream().anyMatch(l -> l != null && l.getString().contains(descStr));
+            boolean active = net.marewmod.quiver.item.QuiverItem.isAutoRefillActive(stack);
+            Text status = active ? Text.literal("Active").formatted(Formatting.GREEN)
+                                 : Text.literal("Inactive").formatted(Formatting.RED);
+            Text hint = Text.literal("[Hover + T to toggle]").formatted(Formatting.DARK_GRAY);
+            String enchName = Text.translatable("enchantment.quiver.auto_refill").getString();
+            for (int i = 0; i < lines.size(); i++) {
+                if (lines.get(i) != null && lines.get(i).getString().contains(enchName)) {
+                    int ins = i + 1;
+                    if (!descPresent) lines.add(ins++, Text.translatable("enchantment.quiver.auto_refill.desc").formatted(Formatting.DARK_GRAY));
+                    lines.add(ins++, status);
+                    lines.add(ins, hint);
+                    return;
+                }
+            }
         });
 
         ColorProviderRegistry.ITEM.register((stack, tintIndex) -> dyeColor(stack, tintIndex), ModItems.QUIVER);

@@ -45,6 +45,27 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
 
 
 
+    /** Set true during QuiverTrinketRenderer to suppress glint on the 3D strap model. */
+    public static final ThreadLocal<Boolean> IN_TRINKET_RENDER = ThreadLocal.withInitial(() -> false);
+
+    private static final String AUTO_REFILL_KEY = "AutoRefillActive";
+
+    public static boolean isAutoRefillActive(ItemStack stack) {
+        NbtCompound nbt = stack.getNbt();
+        return nbt == null || !nbt.contains(AUTO_REFILL_KEY) || nbt.getBoolean(AUTO_REFILL_KEY);
+    }
+
+    public static void toggleAutoRefill(ItemStack stack) {
+        stack.getOrCreateNbt().putBoolean(AUTO_REFILL_KEY, !isAutoRefillActive(stack));
+    }
+
+    @Override
+    public boolean hasGlint(ItemStack stack) {
+        if (!net.marewmod.quiver.config.QuiverConfig.get().enchantment_glint) return false;
+        if (IN_TRINKET_RENDER.get()) return false;
+        return super.hasGlint(stack);
+    }
+
     public static final String SLOTS_KEY = "ArrowSlots";
     private static final String ID_KEY    = "Id";
     private static final String COUNT_KEY = "Count";
@@ -97,7 +118,8 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
 
     @Override
     public void onEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {
-        // No guards — test if onEquip fires at all
+        if (entity.getWorld().isClient()) return;
+        if (entity instanceof PlayerEntity p && SUPPRESS_EQUIP_SOUND.remove(p.getUuid())) return;
         entity.playSound(net.minecraft.sound.SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 1.0f, 1.0f);
     }
 

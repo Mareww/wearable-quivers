@@ -33,5 +33,8 @@
   "config.wearable_quivers.rightHip": "Right Hip",
   "config.wearable_quivers.rightHip.x": "X",
   "config.wearable_quivers.rightHip.y": "Y",
-  "config.wearable_quivers.rightHip.z": "Z"
+  "config.wearable_quivers.rightHip.z": "Z",
+
+  "enchantment.quiver.auto_refill": "Auto Refill",
+  "enchantment.quiver.auto_refill.desc": "Automatically pulls arrows from your inventory into the quiver."
 }

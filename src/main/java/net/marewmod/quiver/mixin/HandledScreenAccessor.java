@@ -14,4 +14,7 @@ public interface HandledScreenAccessor {
     /** Top edge of the GUI background in screen pixels. */
     @Accessor("y")
     int getY();
+
+    @Accessor("focusedSlot")
+    net.minecraft.screen.slot.Slot getFocusedSlot();
 }

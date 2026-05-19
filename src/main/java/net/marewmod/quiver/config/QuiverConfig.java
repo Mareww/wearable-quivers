@@ -22,6 +22,7 @@ public class QuiverConfig {
     public boolean render_quiver = true;
     public boolean auto_fill = true;
     public boolean auto_switch = true;
+    public boolean enchantment_glint = true;
 
     public boolean isHipLeft() {
         return !"right".equals(hip_side);
