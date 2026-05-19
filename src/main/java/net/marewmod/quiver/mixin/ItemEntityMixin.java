@@ -30,19 +30,18 @@ public class ItemEntityMixin {
 
         TrinketsApi.getTrinketComponent(player).ifPresent(comp -> {
             for (var pair : comp.getAllEquipped()) {
-                // Use the SlotReference to get the actual slot — pair.getRight() may be a copy
                 dev.emi.trinkets.api.SlotReference ref = pair.getLeft();
                 ItemStack quiverStack = ref.inventory().getStack(ref.index());
                 if (!(quiverStack.getItem() instanceof QuiverItem)) continue;
 
                 int space = QuiverItem.getMaxCapacity(quiverStack) - QuiverItem.getTotalCount(quiverStack);
-                if (space <= 0) return;
+                if (space <= 0) continue;
 
                 ItemStack toInsert = entityStack.copy();
                 toInsert.setCount(Math.min(entityStack.getCount(), space));
 
                 int inserted = QuiverItem.insertPublic(quiverStack, toInsert);
-                if (inserted <= 0) return;
+                if (inserted <= 0) continue;
 
                 ref.inventory().markDirty(); // persist the change to the actual slot
                 entityStack.decrement(inserted);

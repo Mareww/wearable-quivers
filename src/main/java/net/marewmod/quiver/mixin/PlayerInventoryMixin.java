@@ -17,25 +17,37 @@ public class PlayerInventoryMixin {
 
     @Shadow public PlayerEntity player;
 
-    @Inject(method = "insertStack(Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"))
+    @Inject(method = "insertStack(Lnet/minecraft/item/ItemStack;)Z", at = @At("HEAD"), cancellable = true)
     private void tryRouteArrowToQuiver(ItemStack stack, CallbackInfoReturnable<Boolean> cir) {
         if (stack.isEmpty() || !(stack.getItem() instanceof ArrowItem)) return;
         if (player.getWorld().isClient()) return;
         if (!net.marewmod.quiver.config.QuiverConfig.get().auto_fill) return;
+        if (player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler) return;
 
-        TrinketsApi.getTrinketComponent(player).ifPresent(comp -> {
-            for (var pair : comp.getAllEquipped()) {
-                // Use the SlotReference to get the actual slot — pair.getRight() may be a copy
-                dev.emi.trinkets.api.SlotReference ref = pair.getLeft();
-                ItemStack quiverStack = ref.inventory().getStack(ref.index());
-                if (!(quiverStack.getItem() instanceof QuiverItem)) continue;
-                int inserted = QuiverItem.insertPublic(quiverStack, stack);
-                if (inserted > 0) {
-                    stack.decrement(inserted);
-                    ref.inventory().markDirty();
-                }
-                return;
-            }
-        });
+        // Route arrow into the quiver with the most arrows (skip ghosts with 0)
+        boolean[] inserted = {false};
+        TrinketsApi.getTrinketComponent(player).ifPresent(comp ->
+            comp.getAllEquipped().stream()
+                .filter(p -> p.getRight().getItem() instanceof QuiverItem)
+                .max(java.util.Comparator.comparingInt(p ->
+                    QuiverItem.getTotalCount(p.getLeft().inventory().getStack(p.getLeft().index()))))
+                .ifPresent(best -> {
+                    dev.emi.trinkets.api.SlotReference ref = best.getLeft();
+                    ItemStack quiverStack = ref.inventory().getStack(ref.index());
+                    int count = QuiverItem.insertPublic(quiverStack, stack);
+                    if (count > 0) {
+                        stack.decrement(count);
+                        QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
+                        ref.inventory().markDirty();
+                        inserted[0] = true;
+                    }
+                })
+        );
+
+        // If quiver consumed all arrows, return true so the arrow entity discards itself
+        if (inserted[0] && stack.isEmpty()) {
+            cir.setReturnValue(true);
+            cir.cancel();
+        }
     }
 }

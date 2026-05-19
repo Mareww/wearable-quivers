@@ -7,6 +7,7 @@
     "BowItemMixin",
     "ArmorDyeRecipeMixin",
     "ItemEntityMixin",
+    "PlayerInventoryMixin",
     "SmithingScreenHandlerMixin",
     "CrossbowItemMixin",
     "InfinityEnchantmentMixin",

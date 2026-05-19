@@ -80,6 +80,7 @@ public class BowItemMixin {
         if (slotRef != null) {
             ItemStack copy = slotRef.inventory().getStack(slotRef.index()).copy();
             QuiverItem.consumeOneArrow(copy);
+            QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
             slotRef.inventory().setStack(slotRef.index(), copy);
         } else {
             QuiverItem.consumeOneArrow(quiver);

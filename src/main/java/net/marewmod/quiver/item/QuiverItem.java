@@ -39,6 +39,10 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
     /** Set during right-click equip to steer Trinkets into the preferred slot group. */
     public static final ThreadLocal<String> EQUIP_PREFERRED_GROUP = ThreadLocal.withInitial(() -> null);
 
+    /** Players whose next onEquip sound should be suppressed (scroll / arrow consume — NBT-only changes). */
+    public static final java.util.Set<java.util.UUID> SUPPRESS_EQUIP_SOUND =
+        java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
 
 
     public static final String SLOTS_KEY = "ArrowSlots";
@@ -92,9 +96,10 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
     public void onUnequip(ItemStack stack, SlotReference slot, LivingEntity entity) {}
 
     @Override
-    public void onEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {}
-    // Sound is played directly in use() so it only fires on explicit right-click equip,
-    // never on scroll/shoot NBT changes or Trinkets component syncs.
+    public void onEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {
+        // No guards — test if onEquip fires at all
+        entity.playSound(net.minecraft.sound.SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 1.0f, 1.0f);
+    }
 
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
@@ -104,8 +109,6 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
         boolean equipped = TrinketItem.equipItem(user, stack);
         EQUIP_PREFERRED_GROUP.remove();
         if (!equipped) equipped = TrinketItem.equipItem(user, stack);
-        if (equipped && !world.isClient())
-            user.playSound(net.minecraft.sound.SoundEvents.ITEM_ARMOR_EQUIP_LEATHER, 1.0f, 1.0f);
         return equipped ? TypedActionResult.success(stack) : TypedActionResult.fail(stack);
     }
 

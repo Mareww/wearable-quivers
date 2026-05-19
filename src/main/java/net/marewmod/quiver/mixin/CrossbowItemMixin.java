@@ -46,6 +46,7 @@ public class CrossbowItemMixin {
         if (ref != null) {
             ItemStack copy = ref.inventory().getStack(ref.index()).copy();
             QuiverItem.consumeOneArrow(copy);
+            QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
             ref.inventory().setStack(ref.index(), copy);
         } else if (quiverStack != null && !quiverStack.isEmpty() &&
                 quiverStack.getItem() instanceof QuiverItem) {

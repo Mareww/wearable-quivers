@@ -106,6 +106,7 @@ public class QuiverMod implements ModInitializer {
                         int next = Math.max(0, Math.min(n - 1, cur + direction));
                         ItemStack updated = live.copy();
                         QuiverItem.setSelectedSlot(updated, next);
+                        QuiverItem.SUPPRESS_EQUIP_SOUND.add(player.getUuid());
                         keep.inventory().setStack(keep.index(), updated);
                         if (player instanceof net.minecraft.server.network.ServerPlayerEntity) {
                             net.minecraft.server.network.ServerPlayerEntity sp = (net.minecraft.server.network.ServerPlayerEntity) player;
