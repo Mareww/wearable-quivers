@@ -1,7 +1,0 @@
-{
-  "replace": false,
-  "values": [
-    "quiver:quiver", "quiver:copper_quiver", "quiver:iron_quiver",
-    "quiver:gold_quiver", "quiver:diamond_quiver", "quiver:netherite_quiver"
-  ]
-}

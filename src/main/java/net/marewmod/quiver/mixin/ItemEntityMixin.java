@@ -33,6 +33,8 @@ public class ItemEntityMixin {
                 dev.emi.trinkets.api.SlotReference ref = pair.getLeft();
                 ItemStack quiverStack = ref.inventory().getStack(ref.index());
                 if (!(quiverStack.getItem() instanceof QuiverItem)) continue;
+                if (net.minecraft.enchantment.EnchantmentHelper.getLevel(net.marewmod.quiver.QuiverMod.AUTO_REFILL, quiverStack) <= 0) continue;
+                if (!QuiverItem.isAutoRefillActive(quiverStack)) continue;
 
                 int space = QuiverItem.getMaxCapacity(quiverStack) - QuiverItem.getTotalCount(quiverStack);
                 if (space <= 0) continue;

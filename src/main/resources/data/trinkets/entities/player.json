@@ -1,7 +1,7 @@
 {
   "replace": false,
   "slots": [
-    "legs/quiver"
+    "chest/quiver"
   ],
   "entities": [
     "minecraft:player"

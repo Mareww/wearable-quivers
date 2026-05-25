@@ -29,6 +29,9 @@ public class PlayerInventoryMixin {
         TrinketsApi.getTrinketComponent(player).ifPresent(comp ->
             comp.getAllEquipped().stream()
                 .filter(p -> p.getRight().getItem() instanceof QuiverItem)
+                .filter(p -> net.minecraft.enchantment.EnchantmentHelper.getLevel(
+                    net.marewmod.quiver.QuiverMod.AUTO_REFILL, p.getRight()) > 0)
+                .filter(p -> QuiverItem.isAutoRefillActive(p.getRight()))
                 .max(java.util.Comparator.comparingInt(p ->
                     QuiverItem.getTotalCount(p.getLeft().inventory().getStack(p.getLeft().index()))))
                 .ifPresent(best -> {

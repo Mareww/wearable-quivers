@@ -52,7 +52,8 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
 
     public static boolean isAutoRefillActive(ItemStack stack) {
         NbtCompound nbt = stack.getNbt();
-        return nbt == null || !nbt.contains(AUTO_REFILL_KEY) || nbt.getBoolean(AUTO_REFILL_KEY);
+        if (nbt == null || !nbt.contains(AUTO_REFILL_KEY)) return false;
+        return nbt.getBoolean(AUTO_REFILL_KEY);
     }
 
     public static void toggleAutoRefill(ItemStack stack) {
@@ -100,14 +101,18 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
 
     @Override
     public boolean canEquip(ItemStack stack, SlotReference slot, LivingEntity entity) {
-        // Steer right-click equip to the preferred group when set
         String preferred = EQUIP_PREFERRED_GROUP.get();
         if (preferred != null && !slot.inventory().getSlotType().getGroup().equals(preferred))
             return false;
-        // Only one quiver at a time
+        String targetGroup = slot.inventory().getSlotType().getGroup();
         return TrinketsApi.getTrinketComponent(entity).map(comp -> {
-            for (var pair : comp.getAllEquipped()) {
-                if (pair.getRight().getItem() instanceof QuiverItem) return false;
+            var group = comp.getInventory().get(targetGroup);
+            if (group == null) return true;
+            for (var inv : group.values()) {
+                for (int i = 0; i < inv.size(); i++) {
+                    if (inv == slot.inventory() && i == slot.index()) continue;
+                    if (inv.getStack(i).getItem() instanceof QuiverItem) return false;
+                }
             }
             return true;
         }).orElse(true);
@@ -126,11 +131,7 @@ public class QuiverItem extends Item implements Trinket, DyeableItem {
     @Override
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
-        // Try chest/back first (natural exclusion with backpack); fall back to legs/quiver
-        EQUIP_PREFERRED_GROUP.set("chest");
         boolean equipped = TrinketItem.equipItem(user, stack);
-        EQUIP_PREFERRED_GROUP.remove();
-        if (!equipped) equipped = TrinketItem.equipItem(user, stack);
         return equipped ? TypedActionResult.success(stack) : TypedActionResult.fail(stack);
     }
 

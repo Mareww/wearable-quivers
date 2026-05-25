@@ -42,70 +42,10 @@ public class QuiverModClient implements ClientModInitializer {
     private static float arrowXOffset = 0f;
     private static int lastArrowSel = -1;
 
-    // Slot icon animation state
-    private static net.minecraft.client.texture.NativeImageBackedTexture slotAnimTex;
-    private static net.minecraft.client.texture.NativeImage slotFrame0; // quiver icon
-    private static net.minecraft.client.texture.NativeImage slotFrame1; // back slot icon
-    private static int slotAnimTick = 0;
-    private static final net.minecraft.util.Identifier SLOT_ANIM_ID =
-        new net.minecraft.util.Identifier("trinkets", "textures/gui/slots/back.png");
-
     @Override
     public void onInitializeClient() {
         QuiverConfig.load();
 
-
-        // Load both slot icon frames after resources load and combine them into an animated texture
-        net.fabricmc.fabric.api.resource.ResourceManagerHelper
-            .get(net.minecraft.resource.ResourceType.CLIENT_RESOURCES)
-            .registerReloadListener(new net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener() {
-                @Override
-                public net.minecraft.util.Identifier getFabricId() {
-                    return new net.minecraft.util.Identifier("quiver", "slot_icon_anim");
-                }
-                @Override
-                public void reload(net.minecraft.resource.ResourceManager manager) {
-                    try {
-                        if (slotFrame0 != null) { slotFrame0.close(); slotFrame0 = null; }
-                        if (slotFrame1 != null) { slotFrame1.close(); slotFrame1 = null; }
-                        slotFrame0 = net.minecraft.client.texture.NativeImage.read(
-                            manager.getResource(new net.minecraft.util.Identifier("quiver", "textures/gui/slots/quiver_slot.png")).get().getInputStream());
-                        slotFrame1 = net.minecraft.client.texture.NativeImage.read(
-                            manager.getResource(new net.minecraft.util.Identifier("trinkets", "textures/gui/slots/back.png")).get().getInputStream());
-                        // Create texture sized to frame0
-                        int w = slotFrame0.getWidth(), h = slotFrame0.getHeight();
-                        net.minecraft.client.texture.NativeImage img =
-                            new net.minecraft.client.texture.NativeImage(w, h, false);
-                        for (int y = 0; y < h; y++)
-                            for (int x = 0; x < w; x++)
-                                img.setColor(x, y, slotFrame0.getColor(x, y));
-                        if (slotAnimTex != null) slotAnimTex.close();
-                        slotAnimTex = new net.minecraft.client.texture.NativeImageBackedTexture(img);
-                        MinecraftClient.getInstance().getTextureManager()
-                            .registerTexture(SLOT_ANIM_ID, slotAnimTex);
-                        slotAnimTick = 0;
-                    } catch (Exception e) {
-                        QuiverMod.LOGGER.warn("[Quiver] Could not load slot icon animation frames: {}", e.getMessage());
-                    }
-                }
-            });
-
-        // Swap between frame0 (quiver) and frame1 (back slot) every 20 ticks (1 second)
-        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (slotAnimTex == null || slotFrame0 == null || slotFrame1 == null) return;
-            slotAnimTick++;
-            if (slotAnimTick % 20 != 0) return;
-            // frame 1 (back icon) shows first, then frame 0 (quiver) — matches show=1 wait 1s show=0
-            boolean showBack = (slotAnimTick / 20) % 2 == 0;
-            net.minecraft.client.texture.NativeImage src = showBack ? slotFrame1 : slotFrame0;
-            net.minecraft.client.texture.NativeImage dst = slotAnimTex.getImage();
-            if (dst == null) return;
-            int w = dst.getWidth(), h = dst.getHeight();
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                    dst.setColor(x, y, src.getColor(x, y));
-            slotAnimTex.upload();
-        });
 
         // Server → client: directly update SelectedSlot on the equipped quiver
         ClientPlayNetworking.registerGlobalReceiver(

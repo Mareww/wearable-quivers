@@ -44,7 +44,8 @@ public class QuiverTrinketRenderer implements TrinketRenderer {
 
         QuiverConfig cfg = QuiverConfig.get();
         if (!cfg.render_quiver) return;
-        boolean isHip  = slotReference.inventory().getSlotType().getName().equals("quiver") && slotReference.inventory().getSlotType().getGroup().equals("legs");
+        boolean isHip  = cfg.quiver_position.equals("leg") ||
+                         (!cfg.quiver_position.equals("force_back") && backOccupied(entity, slotReference));
         boolean isLeft = cfg.isHipLeft();
 
         if (contextModel instanceof BipedEntityModel<?> bm) {
@@ -97,44 +98,6 @@ public class QuiverTrinketRenderer implements TrinketRenderer {
         }
     }
 
-    // ── Baldric: 3 strap segments in body-local space ──────────────────────────
-
-    private void renderBaldric(ItemStack stack, MatrixStack m,
-                                VertexConsumerProvider vcp, LivingEntity entity, int light,
-                                QuiverConfig cfg) {
-        BALDRIC_MODE.set(true);
-
-        // ── Anatomy (body-local coords: +X=player LEFT, +Y=DOWN, +Z=BEHIND player) ──
-        // Player body: ±0.25 wide(X), Y=0(shoulder top) to Y=0.75(waist), Z=±0.125(depth)
-        //
-        // Quiver back-left edge ≈ -0.1f + 0.09  (model half-width 0.125 × scale 0.7)
-        // Quiver upper area    ≈ 0.35f − 0.26   (model top Y=16 maps to body Y≈back.y−0.35)
-
-        // Body: Y=2..13, scale=0.7 → center Y=(7.5/16)*0.7+back.y
-        // Rim top: Y=15/16=0.9375 → body-local ≈ back.y − (0.9375−0.5)*0.7 ≈ back.y − 0.306
-        float sx = -0.1f + 0.09f;   // quiver left edge (model X=10 at this scale)
-        float sy = 0.35f - 0.28f;   // upper body just below rim top
-        float bz = 0.13f;           // back surface Z
-
-        // Fixed anatomical endpoints derived from player model
-        float shoulderX =  0.25f;  // left shoulder = body left edge
-        float shoulderY =  0.02f;  // just below shoulder top
-        float frontZ    = -0.14f;  // chest front face Z
-        float hipX      = -0.20f;  // right hip
-        float hipY      =  0.68f;  // waist level
-
-        // Segment 1: back diagonal — quiver upper area → left shoulder (back face)
-        seg(stack, m, vcp, entity, light, sx, sy, bz, shoulderX, shoulderY, bz);
-
-        // Segment 2: shoulder wrap — left shoulder wraps over from back to front
-        seg(stack, m, vcp, entity, light, shoulderX, shoulderY, bz, shoulderX, shoulderY, frontZ);
-
-        // Segment 3: chest diagonal — left shoulder (front) → right hip (front)
-        seg(stack, m, vcp, entity, light, shoulderX, shoulderY, frontZ, hipX, hipY, frontZ);
-
-        BALDRIC_MODE.remove();
-    }
-
     /** Renders a strap from (x1,y1,z1) to (x2,y2,z2) in body-local space. */
     private void seg(ItemStack stack, MatrixStack m, VertexConsumerProvider vcp,
                      LivingEntity entity, int light,
@@ -162,31 +125,46 @@ public class QuiverTrinketRenderer implements TrinketRenderer {
         m.pop();
     }
 
-    /**
-     * Renders one strap segment.
-     * The baldric model is a strip 1.0 long × 0.25 wide × 0.25 thick (in [0,1] block space),
-     * centered at origin after translate(-0.5, -0.5, -0.5).
-     * We scale X to the desired length and Y/Z to a thin strap width.
-     */
-    private void renderStrap(ItemStack stack, MatrixStack m,
-                              VertexConsumerProvider vcp, LivingEntity entity, int light,
-                              float mx, float my, float mz,
-                              RotationAxis rotAxis, float rotAngle,
-                              float length) {
-        m.push();
-        m.translate(mx, my, mz);
-        m.multiply(rotAxis.rotationDegrees(rotAngle));
-        m.scale(length, SW, SW);
-        m.translate(-0.5f, -0.5f, -0.5f);
-        renderItem(stack, m, vcp, entity, light);
-        m.pop();
-    }
-
     private void renderItem(ItemStack stack, MatrixStack m,
                              VertexConsumerProvider vcp, LivingEntity entity, int light) {
         MinecraftClient.getInstance().getItemRenderer().renderItem(
             entity, stack, ModelTransformationMode.NONE, false,
             m, vcp, entity.getWorld(), light, OverlayTexture.DEFAULT_UV, entity.getId()
         );
+    }
+
+    // Cache backOccupied result per entity per world tick to prevent per-frame flicker during sync.
+    private static final java.util.HashMap<Integer, Boolean> BACK_CACHE = new java.util.HashMap<>();
+    private static long BACK_CACHE_TICK = -1;
+
+    /** Returns true if something back-rendering is equipped (stable across frames within the same tick). */
+    private static boolean backOccupied(LivingEntity entity, SlotReference ownSlot) {
+        var client = net.minecraft.client.MinecraftClient.getInstance();
+        long tick = (client.world != null) ? client.world.getTime() : -1;
+        if (tick != BACK_CACHE_TICK) { BACK_CACHE.clear(); BACK_CACHE_TICK = tick; }
+        return BACK_CACHE.computeIfAbsent(entity.getId(), id -> computeBackOccupied(entity, ownSlot));
+    }
+
+    private static boolean computeBackOccupied(LivingEntity entity, SlotReference ownSlot) {
+        // Vanilla chest slot: elytra and mod backpacks are not ArmorItem
+        var chestArmor = entity.getEquippedStack(net.minecraft.entity.EquipmentSlot.CHEST);
+        if (!chestArmor.isEmpty() && !(chestArmor.getItem() instanceof net.minecraft.item.ArmorItem)) return true;
+
+        // Trinket chest/back and chest/cape slots
+        return dev.emi.trinkets.api.TrinketsApi.getTrinketComponent(entity).map(comp -> {
+            var chestGroup = comp.getInventory().get("chest");
+            if (chestGroup == null) return false;
+            for (String key : new String[]{ "back", "cape" }) {
+                var inv = chestGroup.get(key);
+                if (inv == null) continue;
+                for (int i = 0; i < inv.size(); i++) {
+                    if (inv == ownSlot.inventory() && i == ownSlot.index()) continue;
+                    ItemStack s = inv.getStack(i);
+                    if (!s.isEmpty() && !(s.getItem() instanceof net.marewmod.quiver.item.QuiverItem))
+                        return true;
+                }
+            }
+            return false;
+        }).orElse(false);
     }
 }
