@@ -225,15 +225,18 @@ public class QuiverMod implements ModInitializer {
             if (!source.isBuiltin()) return;
             net.marewmod.quiver.config.QuiverConfig cfg = net.marewmod.quiver.config.QuiverConfig.get();
             if (!cfg.auto_refill_enchantment) return;
-            if (!cfg.auto_refill_loot_tables.contains(id.toString())) return;
-            net.minecraft.item.ItemStack book = net.minecraft.item.Items.ENCHANTED_BOOK.getDefaultStack();
-            net.minecraft.item.EnchantedBookItem.addEnchantment(book,
-                new net.minecraft.enchantment.EnchantmentLevelEntry(AUTO_REFILL, 1));
-            tableBuilder.pool(LootPool.builder()
-                .rolls(ConstantLootNumberProvider.create(1))
-                .with(ItemEntry.builder(net.minecraft.item.Items.ENCHANTED_BOOK)
-                    .apply(net.minecraft.loot.function.SetNbtLootFunction.builder(book.getNbt())))
-                .conditionally(RandomChanceLootCondition.builder(0.06f)));
+            String tableStr = id.toString();
+            for (net.marewmod.quiver.config.QuiverConfig.LootEntry entry : cfg.auto_refill_loot_entries) {
+                if (!tableStr.equals(entry.table)) continue;
+                net.minecraft.item.ItemStack book = net.minecraft.item.Items.ENCHANTED_BOOK.getDefaultStack();
+                net.minecraft.item.EnchantedBookItem.addEnchantment(book,
+                    new net.minecraft.enchantment.EnchantmentLevelEntry(AUTO_REFILL, 1));
+                tableBuilder.pool(LootPool.builder()
+                    .rolls(ConstantLootNumberProvider.create(1))
+                    .with(ItemEntry.builder(net.minecraft.item.Items.ENCHANTED_BOOK)
+                        .apply(net.minecraft.loot.function.SetNbtLootFunction.builder(book.getNbt())))
+                    .conditionally(RandomChanceLootCondition.builder(entry.chance / 100f)));
+            }
         });
 
         net.fabricmc.fabric.api.object.builder.v1.trade.TradeOfferHelper.registerVillagerOffers(
@@ -249,11 +252,15 @@ public class QuiverMod implements ModInitializer {
 
         LootTableEvents.MODIFY.register((resourceManager, lootManager, id, tableBuilder, source) -> {
             if (!source.isBuiltin()) return;
-            if (!net.marewmod.quiver.config.QuiverConfig.get().quiver_loot_tables.contains(id.toString())) return;
-            tableBuilder.pool(LootPool.builder()
-                .rolls(ConstantLootNumberProvider.create(1))
-                .with(ItemEntry.builder(ModItems.QUIVER).weight(1))
-                .conditionally(RandomChanceLootCondition.builder(0.12f)));
+            String tableStr = id.toString();
+            for (net.marewmod.quiver.config.QuiverConfig.LootEntry entry
+                    : net.marewmod.quiver.config.QuiverConfig.get().quiver_loot_entries) {
+                if (!tableStr.equals(entry.table)) continue;
+                tableBuilder.pool(LootPool.builder()
+                    .rolls(ConstantLootNumberProvider.create(1))
+                    .with(ItemEntry.builder(ModItems.QUIVER).weight(1))
+                    .conditionally(RandomChanceLootCondition.builder(entry.chance / 100f)));
+            }
         });
 
         // Strip Auto Refill from all online players on /reload if enchantment is disabled

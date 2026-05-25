@@ -9,11 +9,21 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class QuiverConfig {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static QuiverConfig instance;
+
+    public static class LootEntry {
+        public String table  = "";
+        public int    chance = 10; // percent (e.g. 12 = 12%)
+        public LootEntry() {}
+        public LootEntry(String table, int chance) { this.table = table; this.chance = chance; }
+    }
 
     public String _quiver_position_options = "back, leg, force_back";
     public String quiver_position = "back";
@@ -25,17 +35,22 @@ public class QuiverConfig {
     public boolean auto_fill = true;
     public boolean enchantment_glint = true;
     public boolean auto_refill_enchantment = true;
-    public java.util.List<String> auto_refill_loot_tables = new java.util.ArrayList<>(java.util.Arrays.asList(
-        "minecraft:chests/nether_bridge",
-        "minecraft:chests/bastion_treasure"
+
+    public List<LootEntry> auto_refill_loot_entries = new ArrayList<>(Arrays.asList(
+        new LootEntry("minecraft:chests/nether_bridge",    6),
+        new LootEntry("minecraft:chests/bastion_treasure", 6)
     ));
-    public java.util.List<String> quiver_loot_tables = new java.util.ArrayList<>(java.util.Arrays.asList(
-        "minecraft:chests/simple_dungeon",
-        "minecraft:chests/stronghold_corridor",
-        "minecraft:chests/stronghold_crossing",
-        "minecraft:chests/pillager_outpost",
-        "minecraft:chests/village/village_fletcher"
+    public List<LootEntry> quiver_loot_entries = new ArrayList<>(Arrays.asList(
+        new LootEntry("minecraft:chests/simple_dungeon",           12),
+        new LootEntry("minecraft:chests/stronghold_corridor",      12),
+        new LootEntry("minecraft:chests/stronghold_crossing",      12),
+        new LootEntry("minecraft:chests/pillager_outpost",         12),
+        new LootEntry("minecraft:chests/village/village_fletcher", 12)
     ));
+
+    // Legacy fields — kept for migration from old config format, nulled out on save
+    public List<String> auto_refill_loot_tables = null;
+    public List<String> quiver_loot_tables       = null;
 
     public boolean isHipLeft() {
         return !"right".equals(hip_side);
@@ -59,15 +74,35 @@ public class QuiverConfig {
         } else {
             instance = new QuiverConfig();
         }
+
+        // Migrate old string lists to entry lists
+        if ((instance.auto_refill_loot_entries == null || instance.auto_refill_loot_entries.isEmpty())
+                && instance.auto_refill_loot_tables != null && !instance.auto_refill_loot_tables.isEmpty()) {
+            instance.auto_refill_loot_entries = new ArrayList<>();
+            for (String t : instance.auto_refill_loot_tables)
+                instance.auto_refill_loot_entries.add(new LootEntry(t, 6));
+        }
+        if ((instance.quiver_loot_entries == null || instance.quiver_loot_entries.isEmpty())
+                && instance.quiver_loot_tables != null && !instance.quiver_loot_tables.isEmpty()) {
+            instance.quiver_loot_entries = new ArrayList<>();
+            for (String t : instance.quiver_loot_tables)
+                instance.quiver_loot_entries.add(new LootEntry(t, 12));
+        }
+
+        // Null out legacy fields so they don't persist in future saves
+        instance.auto_refill_loot_tables = null;
+        instance.quiver_loot_tables       = null;
+
         if (instance.quiver_position == null ||
                 (!instance.quiver_position.equals("back") && !instance.quiver_position.equals("leg")
                  && !instance.quiver_position.equals("force_back")))
             instance.quiver_position = "back";
         if (instance.hip_side == null) instance.hip_side = new QuiverConfig().hip_side;
-        if (instance.auto_refill_loot_tables == null)
-            instance.auto_refill_loot_tables = new QuiverConfig().auto_refill_loot_tables;
-        if (instance.quiver_loot_tables == null)
-            instance.quiver_loot_tables = new QuiverConfig().quiver_loot_tables;
+        if (instance.auto_refill_loot_entries == null)
+            instance.auto_refill_loot_entries = new QuiverConfig().auto_refill_loot_entries;
+        if (instance.quiver_loot_entries == null)
+            instance.quiver_loot_entries = new QuiverConfig().quiver_loot_entries;
+
         save();
     }
 
